@@ -880,7 +880,6 @@ export default function App() {
             customer_telegram_id: telegramUser?.id ? String(telegramUser.id) : null,
             customer_phone: profile?.user.phone || null,
             customer_email: profile?.user.email || null,
-            source_url: window.location.href,
           }),
         },
         token
@@ -1130,7 +1129,7 @@ export default function App() {
               />
             </label>
             {productOrderFeedback ? <p className="note">{productOrderFeedback}</p> : null}
-            <div className="sticky-action product-detail-actions">
+            <div className="product-detail-actions">
               <button className="primary" onClick={() => void submitProductQuickOrder()} disabled={productOrderSubmitting}>
                 {productOrderSubmitting ? "Отправляем..." : "Сделать заказ"}
               </button>

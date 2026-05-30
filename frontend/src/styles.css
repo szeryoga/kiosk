@@ -1186,8 +1186,6 @@ label {
 }
 
 .product-detail-actions {
-  position: sticky;
-  bottom: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;

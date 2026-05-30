@@ -218,7 +218,6 @@ class ProductQuickOrderRequest(BaseModel):
     customer_telegram_id: str | None = None
     customer_phone: str | None = None
     customer_email: EmailStr | None = None
-    source_url: str | None = None
 
 
 class ProductQuickOrderResponse(BaseModel):

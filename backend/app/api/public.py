@@ -113,9 +113,6 @@ def _format_quick_order_message(
         lines.extend(["", "Контакты:"])
         lines.extend(contacts)
 
-    if payload.source_url:
-        lines.extend(["", f"Ссылка: {payload.source_url}"])
-
     return "\n".join(lines)
 
 @router.get("/bootstrap", response_model=PublicBootstrapRead)
