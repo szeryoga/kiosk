@@ -357,6 +357,8 @@ function BottomNav({ active, onChange }: { active: NavKey; onChange: (key: NavKe
 
 export default function App() {
   const topStackRef = useRef<HTMLDivElement | null>(null);
+  const productModalRef = useRef<HTMLDivElement | null>(null);
+  const productOrderDetailsRef = useRef<HTMLTextAreaElement | null>(null);
   const telegramUser = useMemo(() => getTelegramUser(), []);
   const [boot, setBoot] = useState<Bootstrap | null>(null);
   const [active, setActive] = useState<NavKey>("catalog");
@@ -516,6 +518,24 @@ export default function App() {
     setPaymentStatusOpen(true);
   }, []);
 
+  useEffect(() => {
+    if (!selectedProduct) return;
+
+    const handleViewportChange = () => {
+      if (document.activeElement === productOrderDetailsRef.current) {
+        ensureProductOrderFieldVisible();
+      }
+    };
+
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [selectedProduct]);
+
   const subcategories = useMemo(() => boot?.subcategories.filter((item) => item.category_id === categoryId) ?? [], [boot, categoryId]);
   const activeCategory = useMemo(() => boot?.categories.find((item) => item.id === categoryId) ?? null, [boot, categoryId]);
   const activeSubcategory = useMemo(() => subcategories.find((item) => item.id === subcategoryId) ?? null, [subcategories, subcategoryId]);
@@ -561,6 +581,27 @@ export default function App() {
     () => [...(profile?.orders ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [profile?.orders]
   );
+
+  function ensureProductOrderFieldVisible() {
+    const textarea = productOrderDetailsRef.current;
+    const modal = productModalRef.current;
+    if (!textarea || !modal) return;
+
+    requestAnimationFrame(() => {
+      textarea.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      const modalRect = modal.getBoundingClientRect();
+      const fieldRect = textarea.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const visibleBottom = Math.min(modalRect.bottom, viewportHeight) - 20;
+
+      if (fieldRect.bottom > visibleBottom) {
+        modal.scrollBy({
+          top: fieldRect.bottom - visibleBottom,
+          behavior: "smooth",
+        });
+      }
+    });
+  }
 
   function addToCart(product: Product) {
     setCart((current) => {
@@ -1109,7 +1150,7 @@ export default function App() {
 
       {selectedProduct && (
         <div className="overlay" onClick={closeProduct}>
-          <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
+          <div ref={productModalRef} className="modal product-modal" onClick={(e) => e.stopPropagation()}>
             <img src={selectedProduct.image_url ?? ""} alt={selectedProduct.name} className="hero-image" />
             <div className="product-detail-head">
               <h3>{selectedProduct.name}</h3>
@@ -1122,10 +1163,14 @@ export default function App() {
             <label className="product-detail-order-field">
               <span>Детали заказа</span>
               <textarea
+                ref={productOrderDetailsRef}
                 rows={5}
                 placeholder="Укажите пожелания к заказу, количество, удобное время связи и другие детали."
                 value={productOrderDetails}
                 onChange={(e) => setProductOrderDetails(e.target.value)}
+                onFocus={() => {
+                  window.setTimeout(() => ensureProductOrderFieldVisible(), 120);
+                }}
               />
             </label>
             {productOrderFeedback ? <p className="note">{productOrderFeedback}</p> : null}
