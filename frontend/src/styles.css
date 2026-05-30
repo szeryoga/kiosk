@@ -1121,6 +1121,12 @@ label {
 
 .product-modal {
   width: min(430px, calc(100vw - 28px));
+  min-height: calc(100dvh - 36px);
+  height: calc(100dvh - 36px);
+  max-height: calc(100dvh - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .product-modal p {
@@ -1182,6 +1188,7 @@ label {
   border-radius: 14px;
   background: rgba(255, 252, 246, 0.96);
   color: var(--ink);
+  caret-color: #4d5836;
   resize: vertical;
 }
 
