@@ -1,0 +1,35 @@
+services:
+  backend:
+    environment:
+      CORS_ORIGINS: http://127.0.0.1:3015,http://localhost:3015,http://127.0.0.1:8015,http://localhost:8015
+    ports:
+      - "127.0.0.1:8015:8000"
+
+  frontend:
+    build:
+      args:
+        VITE_API_BASE: /api
+        VITE_APP_BASE: /app/
+
+  admin:
+    build:
+      args:
+        VITE_API_BASE: /api
+        VITE_ADMIN_BASE: /admin/
+
+  nginx:
+    ports:
+      - "127.0.0.1:3015:80"
+
+  tests:
+    build:
+      context: ./tests
+    profiles: ["tests"]
+    working_dir: /workspace
+    environment:
+      API_BASE: ${TEST_API_BASE:-http://backend:8000/api/public}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./:/workspace
