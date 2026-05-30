@@ -28,6 +28,7 @@ type Settings = {
   delivery_info: string;
   pickup_info: string;
   admin_login: string;
+  admin_telegram_login: string | null;
   sbp_provider_name: string | null;
   sbp_public_label: string | null;
   social_links: SocialLink[];
@@ -1883,6 +1884,14 @@ export default function App() {
                   <div className="panel-head">
                     <h3>СБП</h3>
                   </div>
+                  <label>
+                    Телеграм логин / chat_id для уведомлений
+                    <input
+                      value={settings.admin_telegram_login || ""}
+                      placeholder="@admin_username или 123456789"
+                      onChange={(e) => setSettings({ ...settings, admin_telegram_login: e.target.value || null })}
+                    />
+                  </label>
                   <label>
                     Провайдер СБП
                     <input value={settings.sbp_provider_name || ""} onChange={(e) => setSettings({ ...settings, sbp_provider_name: e.target.value || null })} />

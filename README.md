@@ -81,6 +81,7 @@ Production URLs:
 - Postgres
 - admin auth / JWT
 - S3 storage для изображений товаров и событий
+- Telegram Bot API для быстрых заказов из карточки товара
 - СБП-платежи
 - guest checkout в браузере и Telegram auth внутри Mini App
 

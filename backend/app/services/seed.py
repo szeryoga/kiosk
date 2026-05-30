@@ -29,6 +29,7 @@ def seed_initial_data() -> None:
       db.execute(text("ALTER TABLE social_links DROP COLUMN IF EXISTS image_key"))
       db.execute(text("ALTER TABLE social_links DROP COLUMN IF EXISTS image_url"))
       db.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL"))
+      db.execute(text("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS admin_telegram_login VARCHAR(255)"))
       db.execute(text("""
           UPDATE products
           SET category_id = subcategories.category_id
@@ -55,6 +56,7 @@ def seed_initial_data() -> None:
                   delivery_info="Оплата доставки производится при получении товара в ПВЗ.",
                   pickup_info="Самовывоз доступен в часы работы магазина. Заказ хранится 3 дня.",
                   admin_login=settings.admin_login,
+                  admin_telegram_login=None,
                   admin_password_hash=hash_password(settings.admin_password),
                   sbp_provider_name="СБП",
                   sbp_public_label="Оплата через СБП",

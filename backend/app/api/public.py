@@ -27,6 +27,8 @@ from app.schemas.auth import ProfileUpdateRequest, PublicTelegramAuthRequest, To
 from app.schemas.shop import (
     OrderCreateRequest,
     OrderCreateResponse,
+    ProductQuickOrderRequest,
+    ProductQuickOrderResponse,
     OrderRead,
     PaymentBanksRequest,
     PaymentBanksResponse,
@@ -37,6 +39,7 @@ from app.schemas.shop import (
     PublicBootstrapRead,
 )
 from app.services.auth import create_token
+from app.services.notifications import send_telegram_message
 from app.services.payment import (
     cancel_tbank_payment,
     TBankDeviceInfo,
@@ -73,6 +76,47 @@ def _product_read_from_row(product: Product, orders_count: int | None) -> dict:
         "is_active": product.is_active,
         "orders_count": orders_count or 0,
     }
+
+
+def _format_quick_order_message(
+    product: Product,
+    payload: ProductQuickOrderRequest,
+    settings: ShopSettings,
+    current_user: User | None,
+) -> str:
+    customer_name = payload.customer_name or (current_user.full_name if current_user else None)
+    customer_phone = payload.customer_phone or (current_user.phone if current_user else None)
+    customer_email = payload.customer_email or (current_user.email if current_user else None)
+
+    lines = [
+        f"Новый быстрый заказ: {settings.store_name}",
+        "",
+        f"Товар: {product.name}",
+        f"Цена: {product.price} ₽",
+        f"UUID: {product.uuid}",
+    ]
+    if payload.order_details:
+        lines.extend(["", "Детали заказа:", payload.order_details.strip()])
+
+    contacts: list[str] = []
+    if customer_name:
+        contacts.append(f"Имя: {customer_name}")
+    if payload.customer_username:
+        contacts.append(f"Telegram: @{payload.customer_username.lstrip('@')}")
+    if payload.customer_telegram_id:
+        contacts.append(f"Telegram ID: {payload.customer_telegram_id}")
+    if customer_phone:
+        contacts.append(f"Телефон: {customer_phone}")
+    if customer_email:
+        contacts.append(f"Email: {customer_email}")
+    if contacts:
+        lines.extend(["", "Контакты:"])
+        lines.extend(contacts)
+
+    if payload.source_url:
+        lines.extend(["", f"Ссылка: {payload.source_url}"])
+
+    return "\n".join(lines)
 
 @router.get("/bootstrap", response_model=PublicBootstrapRead)
 def bootstrap(user: User | None = Depends(get_current_user), db: Session = Depends(get_db)) -> PublicBootstrapRead:
@@ -128,6 +172,27 @@ def auth_telegram(payload: PublicTelegramAuthRequest, db: Session = Depends(get_
     db.commit()
     db.refresh(user)
     return TokenResponse(access_token=create_token(str(user.id), "user"), user_id=user.id)
+
+
+@router.post("/product-quick-order", response_model=ProductQuickOrderResponse)
+def create_product_quick_order(
+    payload: ProductQuickOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+) -> ProductQuickOrderResponse:
+    product = db.scalar(select(Product).where(Product.uuid == payload.product_uuid, Product.is_active.is_(True)))
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    settings = db.get(ShopSettings, 1)
+    if not settings:
+        raise HTTPException(status_code=500, detail="Settings missing")
+    if not settings.admin_telegram_login:
+        raise HTTPException(status_code=400, detail="Telegram recipient is not configured")
+
+    message = _format_quick_order_message(product, payload, settings, current_user)
+    send_telegram_message(settings.admin_telegram_login, message)
+    return ProductQuickOrderResponse(ok=True)
 
 
 @router.get("/profile", response_model=ProfileResponse)

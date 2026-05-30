@@ -68,6 +68,7 @@ type Bootstrap = {
 };
 
 type CartItem = Product & { quantity: number };
+type ProductQuickOrderResponse = { ok: boolean };
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const BACKGROUND_SRC = `${import.meta.env.BASE_URL}background.webp`;
@@ -189,6 +190,7 @@ declare global {
         ready?: () => void;
         expand?: () => void;
         close?: () => void;
+        showAlert?: (message: string) => void;
         initDataUnsafe?: { user?: { id?: number; username?: string; first_name?: string; last_name?: string; photo_url?: string } };
       };
     };
@@ -366,6 +368,9 @@ export default function App() {
   const [token, setToken] = useState<string | null>(window.localStorage.getItem("kiosk_user_token"));
   const [error, setError] = useState<string | null>(null);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [productOrderDetails, setProductOrderDetails] = useState("");
+  const [productOrderSubmitting, setProductOrderSubmitting] = useState(false);
+  const [productOrderFeedback, setProductOrderFeedback] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentSession, setPaymentSession] = useState<PaymentSession | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<number | null>(null);
@@ -834,6 +839,8 @@ export default function App() {
 
   function openProduct(product: Product) {
     setSelectedProduct(product);
+    setProductOrderDetails("");
+    setProductOrderFeedback(null);
     setProductUuidInLocation(product.uuid);
   }
 
@@ -846,7 +853,47 @@ export default function App() {
 
   function closeProduct() {
     setSelectedProduct(null);
+    setProductOrderDetails("");
+    setProductOrderFeedback(null);
     setProductUuidInLocation(null, true);
+  }
+
+  async function submitProductQuickOrder() {
+    if (!selectedProduct) return;
+
+    const fullNameFromTelegram = [telegramUser?.last_name, telegramUser?.first_name].filter(Boolean).join(" ").trim() || null;
+    const customerName = profile?.user.full_name || fullNameFromTelegram || profile?.user.username || telegramUser?.username || null;
+    const customerUsername = profile?.user.username || telegramUser?.username || null;
+
+    setProductOrderSubmitting(true);
+    setProductOrderFeedback(null);
+    try {
+      await request<ProductQuickOrderResponse>(
+        "/public/product-quick-order",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            product_uuid: selectedProduct.uuid,
+            order_details: productOrderDetails.trim() || null,
+            customer_name: customerName,
+            customer_username: customerUsername,
+            customer_telegram_id: telegramUser?.id ? String(telegramUser.id) : null,
+            customer_phone: profile?.user.phone || null,
+            customer_email: profile?.user.email || null,
+            source_url: window.location.href,
+          }),
+        },
+        token
+      );
+      const successMessage = "Заказ отправлен администратору в Telegram.";
+      setProductOrderFeedback(successMessage);
+      window.Telegram?.WebApp?.showAlert?.(successMessage);
+      setProductOrderDetails("");
+    } catch (err) {
+      setProductOrderFeedback(err instanceof Error ? err.message : "Не удалось отправить заказ.");
+    } finally {
+      setProductOrderSubmitting(false);
+    }
   }
 
   if (!boot) {
@@ -1073,8 +1120,20 @@ export default function App() {
             {selectedProduct.description && selectedProduct.description !== selectedProduct.short_description ? (
               <p className="product-detail-description">{selectedProduct.description}</p>
             ) : null}
+            <label className="product-detail-order-field">
+              <span>Детали заказа</span>
+              <textarea
+                rows={5}
+                placeholder="Укажите пожелания к заказу, количество, удобное время связи и другие детали."
+                value={productOrderDetails}
+                onChange={(e) => setProductOrderDetails(e.target.value)}
+              />
+            </label>
+            {productOrderFeedback ? <p className="note">{productOrderFeedback}</p> : null}
             <div className="sticky-action product-detail-actions">
-              <button className="primary" onClick={() => addToCart(selectedProduct)}>Добавить в корзину</button>
+              <button className="primary" onClick={() => void submitProductQuickOrder()} disabled={productOrderSubmitting}>
+                {productOrderSubmitting ? "Отправляем..." : "Сделать заказ"}
+              </button>
               <button className="ghost" onClick={closeProduct}>Отмена</button>
             </div>
           </div>

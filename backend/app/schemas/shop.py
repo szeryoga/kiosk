@@ -33,6 +33,7 @@ class ShopSettingsPublicRead(ORMModel):
 
 class ShopSettingsAdminRead(ShopSettingsPublicRead):
     admin_login: str
+    admin_telegram_login: str | None = None
     sbp_provider_name: str | None = None
     sbp_public_label: str | None = None
 
@@ -47,6 +48,7 @@ class ShopSettingsUpdate(BaseModel):
     delivery_info: str
     pickup_info: str
     admin_login: str
+    admin_telegram_login: str | None = None
     admin_password: str | None = None
     sbp_provider_name: str | None = None
     sbp_public_label: str | None = None
@@ -206,6 +208,21 @@ class PaymentBanksResponse(BaseModel):
     banks: list[PaymentBankRead] = []
     qr_payload: str | None = None
     qr_image_svg: str | None = None
+
+
+class ProductQuickOrderRequest(BaseModel):
+    product_uuid: str
+    order_details: str | None = None
+    customer_name: str | None = None
+    customer_username: str | None = None
+    customer_telegram_id: str | None = None
+    customer_phone: str | None = None
+    customer_email: EmailStr | None = None
+    source_url: str | None = None
+
+
+class ProductQuickOrderResponse(BaseModel):
+    ok: bool = True
 
 
 class OrderStatusUpdate(BaseModel):

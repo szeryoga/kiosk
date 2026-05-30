@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
     s3_public_base_url: str = ""
+    telegram_bot_token: str = ""
     tbank_terminal_key: str = ""
     tbank_terminal_password: str = ""
     tbank_debug: bool = False
