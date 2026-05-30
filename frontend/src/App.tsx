@@ -74,7 +74,18 @@ const BACKGROUND_SRC = `${import.meta.env.BASE_URL}background.webp`;
 const PENDING_PAYMENT_STORAGE_KEY = "kiosk_pending_payment_order";
 
 function getProductUuidFromLocation() {
-  return new URLSearchParams(window.location.search).get("product");
+  const params = new URLSearchParams(window.location.search);
+  const productUuid = params.get("product");
+  if (productUuid) {
+    return productUuid;
+  }
+
+  const startParam = params.get("tgWebAppStartParam");
+  if (startParam?.startsWith("product_")) {
+    return startParam.slice("product_".length) || null;
+  }
+
+  return null;
 }
 
 function getPaymentReturnFromLocation() {
