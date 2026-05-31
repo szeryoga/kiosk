@@ -72,6 +72,55 @@ type CartItem = Product & { quantity: number };
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const BACKGROUND_SRC = `${import.meta.env.BASE_URL}background.webp`;
 const PENDING_PAYMENT_STORAGE_KEY = "kiosk_pending_payment_order";
+const DELIVERY_DRAFT_STORAGE_KEY = "kiosk_delivery_draft";
+
+type DeliveryFormState = {
+  last_name: string;
+  first_name: string;
+  middle_name: string;
+  phone: string;
+  email: string;
+  delivery_address: string;
+  customer_note: string;
+  delivery_accepted: boolean;
+  pickup_accepted: boolean;
+};
+
+const EMPTY_DELIVERY_FORM: DeliveryFormState = {
+  last_name: "",
+  first_name: "",
+  middle_name: "",
+  phone: "",
+  email: "",
+  delivery_address: "",
+  customer_note: "",
+  delivery_accepted: false,
+  pickup_accepted: false,
+};
+
+function getStoredDeliveryDraft(): DeliveryFormState {
+  try {
+    const raw = window.localStorage.getItem(DELIVERY_DRAFT_STORAGE_KEY);
+    if (!raw) return EMPTY_DELIVERY_FORM;
+    const parsed = JSON.parse(raw) as Partial<DeliveryFormState> | null;
+    if (!parsed || typeof parsed !== "object") return EMPTY_DELIVERY_FORM;
+    return {
+      ...EMPTY_DELIVERY_FORM,
+      ...parsed,
+      last_name: typeof parsed.last_name === "string" ? parsed.last_name : "",
+      first_name: typeof parsed.first_name === "string" ? parsed.first_name : "",
+      middle_name: typeof parsed.middle_name === "string" ? parsed.middle_name : "",
+      phone: typeof parsed.phone === "string" ? parsed.phone : "",
+      email: typeof parsed.email === "string" ? parsed.email : "",
+      delivery_address: typeof parsed.delivery_address === "string" ? parsed.delivery_address : "",
+      customer_note: typeof parsed.customer_note === "string" ? parsed.customer_note : "",
+      delivery_accepted: Boolean(parsed.delivery_accepted),
+      pickup_accepted: Boolean(parsed.pickup_accepted),
+    };
+  } catch {
+    return EMPTY_DELIVERY_FORM;
+  }
+}
 
 function getProductUuidFromLocation() {
   const params = new URLSearchParams(window.location.search);
@@ -140,11 +189,6 @@ function splitFullName(fullName: string | null | undefined) {
 
 function buildFullName(form: { last_name: string; first_name: string; middle_name: string }) {
   return [form.last_name, form.first_name, form.middle_name].map((value) => value.trim()).filter(Boolean).join(" ");
-}
-
-function getProfileNameFields(user: User | null | undefined) {
-  if (!user) return { last_name: "", first_name: "", middle_name: "" };
-  return splitFullName(user.full_name);
 }
 
 function getPaymentStatusLabel(status: string) {
@@ -403,17 +447,7 @@ export default function App() {
   const [paymentStatusError, setPaymentStatusError] = useState<string | null>(null);
   const [paymentReturnResult, setPaymentReturnResult] = useState<PaymentReturnResult>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("delivery");
-  const [deliveryForm, setDeliveryForm] = useState({
-    last_name: "",
-    first_name: "",
-    middle_name: "",
-    phone: "",
-    email: "",
-    delivery_address: "",
-    customer_note: "",
-    delivery_accepted: false,
-    pickup_accepted: false,
-  });
+  const [deliveryForm, setDeliveryForm] = useState<DeliveryFormState>(() => getStoredDeliveryDraft());
   const [topStackHeight, setTopStackHeight] = useState(0);
 
   async function authorizeTelegramUser(user: NonNullable<ReturnType<typeof getTelegramUser>>) {
@@ -429,13 +463,6 @@ export default function App() {
     setToken(data.access_token);
     const nextProfile = await request<Profile>("/public/profile", undefined, data.access_token);
     setProfile(nextProfile);
-    setDeliveryForm((prev) => ({
-      ...prev,
-      ...getProfileNameFields(nextProfile.user),
-      phone: nextProfile.user.phone ?? "",
-      email: nextProfile.user.email ?? "",
-      delivery_address: nextProfile.user.delivery_address ?? "",
-    }));
   }
 
   useEffect(() => {
@@ -449,18 +476,13 @@ export default function App() {
       .then((data) => {
         setBoot(data);
         setProfile(data.profile);
-        if (data.profile?.user) {
-          setDeliveryForm((prev) => ({
-            ...prev,
-            ...getProfileNameFields(data.profile?.user),
-            phone: data.profile?.user.phone ?? "",
-            email: data.profile?.user.email ?? "",
-            delivery_address: data.profile?.user.delivery_address ?? "",
-          }));
-        }
       })
       .catch((err) => setError(err.message));
   }, [token]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DELIVERY_DRAFT_STORAGE_KEY, JSON.stringify(deliveryForm));
+  }, [deliveryForm]);
 
   useEffect(() => {
     if (!telegramUser || !token || !boot || profile) return;
@@ -607,20 +629,7 @@ export default function App() {
     );
   }
 
-  function fillDeliveryFormFromUser(user: User) {
-    setDeliveryForm((prev) => ({
-      ...prev,
-      ...getProfileNameFields(user),
-      phone: user.phone ?? "",
-      email: user.email ?? "",
-      delivery_address: user.delivery_address ?? "",
-    }));
-  }
-
   function beginCheckout() {
-    if (profile?.user && token) {
-      fillDeliveryFormFromUser(profile.user);
-    }
     setDeliveryErrorDialog(null);
     setDeliveryOpen(true);
   }
@@ -638,25 +647,6 @@ export default function App() {
     };
   }
 
-  async function submitProfileUpdate() {
-    if (!profile) return;
-    const fullName = buildFullName(deliveryForm);
-    const next = await request<Profile>(
-      "/public/profile",
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          full_name: fullName,
-          phone: deliveryForm.phone,
-          email: deliveryForm.email || null,
-          delivery_address: deliveryForm.delivery_address || null,
-        }),
-      },
-      token
-    );
-    setProfile(next);
-  }
-
   async function pay() {
     const fullName = buildFullName(deliveryForm);
     const isComplete = deliveryMode === "delivery"
@@ -671,9 +661,6 @@ export default function App() {
       : true;
     const isAccepted = deliveryMode === "delivery" ? deliveryForm.delivery_accepted : deliveryForm.pickup_accepted;
     if (!isAccepted || !isComplete || cart.length === 0 || total <= 0) return;
-    if (token && profile) {
-      await submitProfileUpdate();
-    }
     const order = await request<Order>(
       "/public/orders",
       {
@@ -729,9 +716,6 @@ export default function App() {
     setDeliveryErrorDialog(null);
     setOrderSubmitting(true);
     try {
-      if (token && profile) {
-        await submitProfileUpdate();
-      }
       await request<Order>("/public/orders/manual", {
         method: "POST",
         body: JSON.stringify(buildOrderPayload()),
