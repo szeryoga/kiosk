@@ -254,7 +254,7 @@ def create_manual_order(
         settings = db.get(ShopSettings, 1)
         if not settings:
             raise HTTPException(status_code=500, detail="Settings missing")
-        send_order_notification(order, settings)
+        send_order_notification(order, settings, current_user)
         db.commit()
         db.refresh(order)
         order.items
