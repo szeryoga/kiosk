@@ -361,6 +361,7 @@ export default function App() {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [cartAddedDialogOpen, setCartAddedDialogOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [token, setToken] = useState<string | null>(window.localStorage.getItem("kiosk_user_token"));
@@ -565,8 +566,7 @@ export default function App() {
       }
       return [...current, { ...product, quantity: 1 }];
     });
-    setSelectedProduct(null);
-    setProductUuidInLocation(null, true);
+    setCartAddedDialogOpen(true);
   }
 
   function toggleCartProduct(product: Product) {
@@ -849,6 +849,18 @@ export default function App() {
     setProductUuidInLocation(null, true);
   }
 
+  function openCartFromDialog() {
+    setCartAddedDialogOpen(false);
+    closeProduct();
+    setActive("cart");
+  }
+
+  function continueShoppingFromDialog() {
+    setCartAddedDialogOpen(false);
+    closeProduct();
+    setActive("catalog");
+  }
+
   if (!boot) {
     return <main className="shell"><div className="state-card">{error || "Загрузка..."}</div></main>;
   }
@@ -1064,19 +1076,31 @@ export default function App() {
       {selectedProduct && (
         <div className="overlay" onClick={closeProduct}>
           <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
-            <img src={selectedProduct.image_url ?? ""} alt={selectedProduct.name} className="hero-image" />
-            <div className="product-detail-head">
-              <h3>{selectedProduct.name}</h3>
-              <strong>{selectedProduct.price} ₽</strong>
+            <div className="product-modal-body">
+              <img src={selectedProduct.image_url ?? ""} alt={selectedProduct.name} className="hero-image" />
+              <div className="product-detail-head">
+                <h3>{selectedProduct.name}</h3>
+                <strong>{selectedProduct.price} ₽</strong>
+              </div>
+              {selectedProduct.short_description ? <p className="product-detail-short">{selectedProduct.short_description}</p> : null}
+              {selectedProduct.description && selectedProduct.description !== selectedProduct.short_description ? (
+                <p className="product-detail-description">{selectedProduct.description}</p>
+              ) : null}
             </div>
-            {selectedProduct.short_description ? <p className="product-detail-short">{selectedProduct.short_description}</p> : null}
-            {selectedProduct.description && selectedProduct.description !== selectedProduct.short_description ? (
-              <p className="product-detail-description">{selectedProduct.description}</p>
-            ) : null}
             <div className="sticky-action product-detail-actions">
               <button className="primary" onClick={() => addToCart(selectedProduct)}>Добавить в корзину</button>
               <button className="ghost" onClick={closeProduct}>Отмена</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {cartAddedDialogOpen && (
+        <div className="overlay" onClick={() => setCartAddedDialogOpen(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Товар добавлен в корзину</h3>
+            <button className="primary" onClick={openCartFromDialog}>Перейти в корзину</button>
+            <button className="ghost" onClick={continueShoppingFromDialog}>Продолжить покупки</button>
           </div>
         </div>
       )}

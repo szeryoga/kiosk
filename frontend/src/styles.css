@@ -1121,6 +1121,26 @@ label {
 
 .product-modal {
   width: min(430px, calc(100vw - 28px));
+  min-height: calc(100dvh - 36px);
+  height: calc(100dvh - 36px);
+  max-height: calc(100dvh - 36px);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.product-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.product-modal .hero-image {
+  height: auto;
+  aspect-ratio: 1 / 1;
+  min-height: min(392px, calc(100vw - 64px));
 }
 
 .product-modal p {
@@ -1167,10 +1187,14 @@ label {
 .product-detail-actions {
   position: sticky;
   bottom: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   margin-top: auto;
+  margin-bottom: 0;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
 }
 
 .dialog {
