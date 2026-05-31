@@ -1224,7 +1224,7 @@ export default function App() {
 
       {orderSuccessOpen && (
         <div className="overlay" onClick={() => setOrderSuccessOpen(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="dialog order-success-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Спасибо за заказ! Для оплаты продавец свяжется с вами</h3>
             <button
               className="primary"
