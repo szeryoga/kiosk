@@ -208,7 +208,26 @@ async function request<T>(path: string, init?: RequestInit, token?: string | nul
     let message = `Request failed: ${response.status}`;
     try {
       const body = await response.json();
-      if (body.detail) message = body.detail;
+      if (body.detail) {
+        if (typeof body.detail === "string") {
+          message = body.detail;
+        } else if (Array.isArray(body.detail)) {
+          message = body.detail
+            .map((item: unknown) => {
+              if (typeof item === "string") return item;
+              if (item && typeof item === "object") {
+                const typedItem = item as { loc?: unknown; msg?: unknown };
+                const location = Array.isArray(typedItem.loc) ? typedItem.loc.slice(1).join(" -> ") : "";
+                const detail = typeof typedItem.msg === "string" ? typedItem.msg : JSON.stringify(item);
+                return location ? `${location}: ${detail}` : detail;
+              }
+              return String(item);
+            })
+            .join("\n");
+        } else {
+          message = JSON.stringify(body.detail);
+        }
+      }
     } catch {
       // ignore
     }
@@ -369,7 +388,7 @@ export default function App() {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
-  const [deliveryError, setDeliveryError] = useState<string | null>(null);
+  const [deliveryErrorDialog, setDeliveryErrorDialog] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentSession, setPaymentSession] = useState<PaymentSession | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<number | null>(null);
@@ -602,7 +621,7 @@ export default function App() {
     if (profile?.user && token) {
       fillDeliveryFormFromUser(profile.user);
     }
-    setDeliveryError(null);
+    setDeliveryErrorDialog(null);
     setDeliveryOpen(true);
   }
 
@@ -707,7 +726,7 @@ export default function App() {
     const isAccepted = deliveryMode === "delivery" ? deliveryForm.delivery_accepted : deliveryForm.pickup_accepted;
     if (!isAccepted || !isComplete || cart.length === 0 || total <= 0 || !fullName) return;
 
-    setDeliveryError(null);
+    setDeliveryErrorDialog(null);
     setOrderSubmitting(true);
     try {
       if (token && profile) {
@@ -728,7 +747,7 @@ export default function App() {
       setPaymentSession(null);
       setPaymentOrderId(null);
     } catch (err) {
-      setDeliveryError(err instanceof Error ? err.message : "Не удалось отправить заказ");
+      setDeliveryErrorDialog(err instanceof Error ? err.message : "Не удалось отправить заказ");
     } finally {
       setOrderSubmitting(false);
     }
@@ -1207,7 +1226,6 @@ export default function App() {
                     </p>
                   </div>
                 )}
-                {deliveryError ? <p className="note">{deliveryError}</p> : null}
               </div>
             </div>
             <div className="delivery-actions">
@@ -1233,6 +1251,16 @@ export default function App() {
             >
               ОК
             </button>
+          </div>
+        </div>
+      )}
+
+      {deliveryErrorDialog && (
+        <div className="overlay" onClick={() => setDeliveryErrorDialog(null)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Не удалось оформить заказ</h3>
+            <p className="note">{deliveryErrorDialog}</p>
+            <button className="primary" onClick={() => setDeliveryErrorDialog(null)}>ОК</button>
           </div>
         </div>
       )}

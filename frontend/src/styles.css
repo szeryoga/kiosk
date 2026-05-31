@@ -1055,6 +1055,7 @@ label {
   min-height: 32px;
   padding: 7px 12px;
   border-radius: 12px;
+  font-size: 16px;
 }
 
 .delivery-field-row textarea {
