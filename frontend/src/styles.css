@@ -915,7 +915,7 @@ label {
   bottom: 0;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   width: min(430px, calc(100vw - 8px));
   padding: 8px 10px calc(12px + env(safe-area-inset-bottom));
