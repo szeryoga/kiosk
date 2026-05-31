@@ -37,6 +37,7 @@ from app.schemas.shop import (
     PublicBootstrapRead,
 )
 from app.services.auth import create_token
+from app.services.notifications import send_order_notification
 from app.services.payment import (
     cancel_tbank_payment,
     TBankDeviceInfo,
@@ -73,6 +74,60 @@ def _product_read_from_row(product: Product, orders_count: int | None) -> dict:
         "is_active": product.is_active,
         "orders_count": orders_count or 0,
     }
+
+
+def _create_order_record(payload: OrderCreateRequest, db: Session, current_user: User | None) -> tuple[Order, bool]:
+    existing = db.scalar(
+        select(Order)
+        .options(selectinload(Order.items).selectinload(OrderItem.product))
+        .where(Order.idempotency_key == payload.idempotency_key)
+    )
+    if existing:
+        return existing, True
+
+    product_ids = [item.product_id for item in payload.items]
+    products = list(db.scalars(select(Product).where(Product.id.in_(product_ids))).all())
+    product_map = {item.id: item for item in products}
+    if len(products) != len(product_ids):
+        raise HTTPException(status_code=400, detail="Some products were not found")
+
+    subtotal = 0
+    order = Order(
+        user_id=current_user.id if current_user else None,
+        customer_name=payload.full_name,
+        customer_phone=payload.phone,
+        customer_email=payload.email,
+        delivery_mode=payload.delivery_mode,
+        delivery_address=payload.delivery_address,
+        customer_note=payload.customer_note,
+        subtotal=0,
+        payment_status=PaymentStatus.pending,
+        fulfillment_status=FulfillmentStatus.new,
+        idempotency_key=payload.idempotency_key,
+    )
+    db.add(order)
+    db.flush()
+
+    for item in payload.items:
+        product = product_map[item.product_id]
+        line_total = product.price * item.quantity
+        subtotal += line_total
+        db.add(
+            OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                product_name=product.name,
+                unit_price=product.price,
+                quantity=item.quantity,
+                line_total=line_total,
+            )
+        )
+
+    order.subtotal = subtotal
+    db.flush()
+    db.refresh(order)
+    order.items
+    return order, False
 
 @router.get("/bootstrap", response_model=PublicBootstrapRead)
 def bootstrap(user: User | None = Depends(get_current_user), db: Session = Depends(get_db)) -> PublicBootstrapRead:
@@ -159,47 +214,10 @@ def update_profile(
 
 @router.post("/orders", response_model=OrderCreateResponse)
 def create_order(payload: OrderCreateRequest, db: Session = Depends(get_db), current_user: User | None = Depends(get_current_user)) -> OrderCreateResponse:
-    product_ids = [item.product_id for item in payload.items]
-    products = list(db.scalars(select(Product).where(Product.id.in_(product_ids))).all())
-    product_map = {item.id: item for item in products}
-    if len(products) != len(product_ids):
-        raise HTTPException(status_code=400, detail="Some products were not found")
-    existing = db.scalar(select(Order).where(Order.idempotency_key == payload.idempotency_key))
-    if existing:
-        existing.items
-        return OrderRead.model_validate(existing)
+    order, existed = _create_order_record(payload, db, current_user)
+    if existed:
+        return OrderCreateResponse(**OrderRead.model_validate(order).model_dump(), payment_session=None)
 
-    subtotal = 0
-    order = Order(
-        user_id=current_user.id if current_user else None,
-        customer_name=payload.full_name,
-        customer_phone=payload.phone,
-        customer_email=payload.email,
-        delivery_mode=payload.delivery_mode,
-        delivery_address=payload.delivery_address,
-        customer_note=payload.customer_note,
-        subtotal=0,
-        payment_status=PaymentStatus.pending,
-        fulfillment_status=FulfillmentStatus.new,
-        idempotency_key=payload.idempotency_key,
-    )
-    db.add(order)
-    db.flush()
-    for item in payload.items:
-        product = product_map[item.product_id]
-        line_total = product.price * item.quantity
-        subtotal += line_total
-        db.add(
-            OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                product_name=product.name,
-                unit_price=product.price,
-                quantity=item.quantity,
-                line_total=line_total,
-            )
-        )
-    order.subtotal = subtotal
     payment_id, payment_url = create_sbp_payment(order)
     order.sbp_payment_id = payment_id
     order.payment_url = payment_url
@@ -223,6 +241,24 @@ def create_order(payload: OrderCreateRequest, db: Session = Depends(get_db), cur
             "banks": [],
         }
     return OrderCreateResponse(**OrderRead.model_validate(order).model_dump(), payment_session=payment_session)
+
+
+@router.post("/orders/manual", response_model=OrderRead)
+def create_manual_order(
+    payload: OrderCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+) -> OrderRead:
+    order, existed = _create_order_record(payload, db, current_user)
+    if not existed:
+        settings = db.get(ShopSettings, 1)
+        if not settings:
+            raise HTTPException(status_code=500, detail="Settings missing")
+        send_order_notification(order, settings)
+        db.commit()
+        db.refresh(order)
+        order.items
+    return OrderRead.model_validate(order)
 
 
 @router.get("/orders/{order_id}", response_model=OrderRead)

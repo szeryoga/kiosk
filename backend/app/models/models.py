@@ -32,6 +32,7 @@ class ShopSettings(TimestampMixin, Base):
     pickup_info: Mapped[str] = mapped_column(Text, default="Самовывоз из магазина по режиму работы.")
     admin_login: Mapped[str] = mapped_column(String(120), default="admin")
     admin_password_hash: Mapped[str] = mapped_column(String(255), default="")
+    admin_telegram_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sbp_provider_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sbp_public_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

@@ -28,6 +28,7 @@ type Settings = {
   delivery_info: string;
   pickup_info: string;
   admin_login: string;
+  admin_telegram_id: string | null;
   sbp_provider_name: string | null;
   sbp_public_label: string | null;
   social_links: SocialLink[];
@@ -1890,6 +1891,20 @@ export default function App() {
                   <label>
                     Публичная надпись оплаты
                     <input value={settings.sbp_public_label || ""} onChange={(e) => setSettings({ ...settings, sbp_public_label: e.target.value || null })} />
+                  </label>
+                </div>
+
+                <div className="panel">
+                  <div className="panel-head">
+                    <h3>Уведомления</h3>
+                  </div>
+                  <label>
+                    Телеграм-ID админа
+                    <input
+                      value={settings.admin_telegram_id || ""}
+                      onChange={(e) => setSettings({ ...settings, admin_telegram_id: e.target.value || null })}
+                      placeholder="@username или chat_id"
+                    />
                   </label>
                 </div>
               </div>

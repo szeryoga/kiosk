@@ -56,6 +56,7 @@ def seed_initial_data() -> None:
                   pickup_info="Самовывоз доступен в часы работы магазина. Заказ хранится 3 дня.",
                   admin_login=settings.admin_login,
                   admin_password_hash=hash_password(settings.admin_password),
+                  admin_telegram_id=None,
                   sbp_provider_name="СБП",
                   sbp_public_label="Оплата через СБП",
               )

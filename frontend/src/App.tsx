@@ -367,6 +367,9 @@ export default function App() {
   const [token, setToken] = useState<string | null>(window.localStorage.getItem("kiosk_user_token"));
   const [error, setError] = useState<string | null>(null);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentSession, setPaymentSession] = useState<PaymentSession | null>(null);
   const [paymentOrderId, setPaymentOrderId] = useState<number | null>(null);
@@ -599,7 +602,21 @@ export default function App() {
     if (profile?.user && token) {
       fillDeliveryFormFromUser(profile.user);
     }
+    setDeliveryError(null);
     setDeliveryOpen(true);
+  }
+
+  function buildOrderPayload() {
+    return {
+      full_name: buildFullName(deliveryForm),
+      phone: deliveryForm.phone,
+      email: deliveryForm.email || null,
+      delivery_mode: deliveryMode,
+      delivery_address: deliveryMode === "delivery" ? deliveryForm.delivery_address : null,
+      customer_note: null,
+      items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
+      idempotency_key: crypto.randomUUID(),
+    };
   }
 
   async function submitProfileUpdate() {
@@ -672,6 +689,48 @@ export default function App() {
     if (order.payment_url) {
       window.localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, String(order.id));
       window.location.href = order.payment_url;
+    }
+  }
+
+  async function submitManualOrder() {
+    const fullName = buildFullName(deliveryForm);
+    const isComplete = deliveryMode === "delivery"
+      ? Boolean(
+        deliveryForm.last_name.trim() &&
+        deliveryForm.first_name.trim() &&
+        deliveryForm.middle_name.trim() &&
+        deliveryForm.phone.trim() &&
+        deliveryForm.email.trim() &&
+        deliveryForm.delivery_address.trim()
+      )
+      : true;
+    const isAccepted = deliveryMode === "delivery" ? deliveryForm.delivery_accepted : deliveryForm.pickup_accepted;
+    if (!isAccepted || !isComplete || cart.length === 0 || total <= 0 || !fullName) return;
+
+    setDeliveryError(null);
+    setOrderSubmitting(true);
+    try {
+      if (token && profile) {
+        await submitProfileUpdate();
+      }
+      await request<Order>("/public/orders/manual", {
+        method: "POST",
+        body: JSON.stringify(buildOrderPayload()),
+      }, token);
+      if (token) {
+        const nextProfile = await request<Profile>("/public/profile", undefined, token);
+        setProfile(nextProfile);
+      }
+      setCart([]);
+      setDeliveryOpen(false);
+      setOrderSuccessOpen(true);
+      setPaymentUrl(null);
+      setPaymentSession(null);
+      setPaymentOrderId(null);
+    } catch (err) {
+      setDeliveryError(err instanceof Error ? err.message : "Не удалось отправить заказ");
+    } finally {
+      setOrderSubmitting(false);
     }
   }
 
@@ -969,7 +1028,7 @@ export default function App() {
                   <div className="muted-line">Итого</div>
                   <strong>{total} ₽</strong>
                 </div>
-                <button className="primary" disabled={cart.length === 0 || total <= 0} onClick={beginCheckout}>Оплатить</button>
+                <button className="primary" disabled={cart.length === 0 || total <= 0} onClick={beginCheckout}>Оформить заказ</button>
               </div>
             </div>
           </section>
@@ -1148,13 +1207,32 @@ export default function App() {
                     </p>
                   </div>
                 )}
-                {paymentUrl ? <p className="note">Платеж уже создан. Если редирект не сработал, открой: <a href={paymentUrl}>{paymentUrl}</a></p> : null}
+                {deliveryError ? <p className="note">{deliveryError}</p> : null}
               </div>
             </div>
             <div className="delivery-actions">
-              <button className="primary" disabled={!canPay} onClick={() => void pay()}>Оплатить</button>
+              <button className="primary" disabled={!canPay || orderSubmitting} onClick={() => void submitManualOrder()}>
+                {orderSubmitting ? "Отправляем..." : "Заказать"}
+              </button>
               <button className="ghost" onClick={() => setDeliveryOpen(false)}>Отмена</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {orderSuccessOpen && (
+        <div className="overlay" onClick={() => setOrderSuccessOpen(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Спасибо за заказ! Для оплаты продавец свяжется с вами</h3>
+            <button
+              className="primary"
+              onClick={() => {
+                setOrderSuccessOpen(false);
+                setActive("catalog");
+              }}
+            >
+              ОК
+            </button>
           </div>
         </div>
       )}

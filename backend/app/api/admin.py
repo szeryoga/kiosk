@@ -89,6 +89,7 @@ def get_settings(db: Session = Depends(get_db)) -> ShopSettingsAdminRead:
         delivery_info=settings.delivery_info,
         pickup_info=settings.pickup_info,
         admin_login="admin",
+        admin_telegram_id=settings.admin_telegram_id,
         sbp_provider_name=settings.sbp_provider_name,
         sbp_public_label=settings.sbp_public_label,
         social_links=social_links,
@@ -109,6 +110,7 @@ def update_settings(payload: ShopSettingsUpdate, db: Session = Depends(get_db)) 
     settings.delivery_info = payload.delivery_info
     settings.pickup_info = payload.pickup_info
     settings.admin_login = "admin"
+    settings.admin_telegram_id = payload.admin_telegram_id.strip() if payload.admin_telegram_id else None
     settings.sbp_provider_name = payload.sbp_provider_name
     settings.sbp_public_label = payload.sbp_public_label
     if payload.admin_password:

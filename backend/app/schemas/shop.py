@@ -33,6 +33,7 @@ class ShopSettingsPublicRead(ORMModel):
 
 class ShopSettingsAdminRead(ShopSettingsPublicRead):
     admin_login: str
+    admin_telegram_id: str | None = None
     sbp_provider_name: str | None = None
     sbp_public_label: str | None = None
 
@@ -48,6 +49,7 @@ class ShopSettingsUpdate(BaseModel):
     pickup_info: str
     admin_login: str
     admin_password: str | None = None
+    admin_telegram_id: str | None = None
     sbp_provider_name: str | None = None
     sbp_public_label: str | None = None
     social_links: list[SocialLinkUpdate]
